@@ -15,7 +15,7 @@ Buffer::~Buffer() {
     pthread_cond_destroy(&condConsumer);
 }
 
-void Buffer::add(int data) {
+void Buffer::add(std::string data) {
     pthread_mutex_lock(&mutex);
     while (dataQueue.size() >= size) {
         pthread_cond_wait(&condProducer, &mutex);
@@ -25,12 +25,12 @@ void Buffer::add(int data) {
     pthread_mutex_unlock(&mutex);
 }
 
-int Buffer::remove() {
+std::string Buffer::remove() {
     pthread_mutex_lock(&mutex);
     while (dataQueue.empty()) {
         pthread_cond_wait(&condConsumer, &mutex);
     }
-    int data = dataQueue.front();
+    std::string data = dataQueue.front();
     dataQueue.pop();
     pthread_cond_signal(&condProducer);
     pthread_mutex_unlock(&mutex);

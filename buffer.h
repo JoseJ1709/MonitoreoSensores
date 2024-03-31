@@ -6,10 +6,11 @@
 
 #include <queue>
 #include <pthread.h>
+#include <string>
 
 class Buffer {
 private:
-    std::queue<int> dataQueue;
+    std::queue<std::string> dataQueue;
     pthread_mutex_t mutex;
     pthread_cond_t condProducer;
     pthread_cond_t condConsumer;
@@ -18,8 +19,8 @@ private:
 public:
     Buffer(int size);
     ~Buffer();
-    void add(int data);
-    int remove();
+    void add(std::string data);
+    std::string remove();
 };
 
 #endif //BUFFER_H

@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <ctime>
 #include "buffer.cpp"
 
 
@@ -16,6 +17,36 @@ struct ThreadArgs {
     char* pipeName;
     bool isFinished;
 };
+
+bool is_float(const std::string& str) {
+    try {
+        std::size_t pos;
+        std::stof(str, &pos);
+        // La conversión tiene éxito si no hay caracteres restantes en la cadena
+        return pos == str.size();
+    } catch (...) {
+        return false;
+    }
+}
+
+// Función para verificar si una cadena representa un número entero
+bool is_integer(const std::string& str) {
+    try {
+        std::size_t pos;
+        std::stoi(str, &pos);
+        // La conversión tiene éxito si no hay caracteres restantes en la cadena
+        return pos == str.size();
+    } catch (...) {
+        return false;
+    }
+}
+std::string getCurrentTime() {
+    std::time_t currentTime = std::time(nullptr);
+    std::tm* localTime = std::localtime(&currentTime);
+    char timeString[100];
+    std::strftime(timeString, sizeof(timeString), "%H:%M:%S", localTime);
+    return std::string(timeString);
+}
 // Thread functions
 void* h_recolector(void* arg) {
 
@@ -32,20 +63,33 @@ void* h_recolector(void* arg) {
         return NULL;
     }
 
-    // Read data from pipe and add to buffers
-    int data;
-    while (read(pipeFd, &data, sizeof(data)) > 0) {
-        if (data >= 0) {
-            if (20>= data <= 31.6) {  // Assuming PH values are between 0 and 100
+    char buffer[128];
+    ssize_t bytesRead;
+    while ((bytesRead = read(pipeFd, buffer, sizeof(buffer) - 1)) > 0) {
+        buffer[bytesRead] = '\0';
+        std::string data(buffer);
+        if (is_integer(data)) {
+            int value = std::stoi(data);
+            if (value >= 0) {
+                bufferTemp->add(data);
+            } else {
+                std::cerr << "Error: received negative value from sensor" << std::endl;
+            }
+        }
+        // Verificar si los datos son de tipo float
+        else if (is_float(data)) {
+            float value = std::stof(data);
+            if (value >= 0.0) {
                 bufferPh->add(data);
             } else {
-                bufferTemp->add(data);
+                std::cerr << "Error: received negative value from sensor" << std::endl;
             }
-        } else {
-            std::cerr << "Error: received negative value from sensor" << std::endl;
         }
+        else {
+            std::cerr << "Error: received invalid value from sensor" << std::endl;
+        }
+            // Verificar si los datos son de tipo entero
     }
-
     // Close pipe
     close(pipeFd);
 
@@ -63,17 +107,23 @@ void* h_ph(void* arg) {
     }
     if(args->isFinished){
         filePh.close();
+        bufferPh->~Buffer();
         return NULL;
     }
 
     // Write data from buffer to file
-    int data;
-    while ((data = bufferPh->remove()) != -1) {  // Assuming -1 indicates end of data
-        filePh << data << " " << time(0) << std::endl;  // Append current time
+    std::string data;
+    while ((data = bufferPh->remove()) != "-1") {
+        float value = std::stof(data);// Assuming -1 indicates end of data
+        if(value >=8.0 || value <= 6.0){
+            std::cout << "Alerta: el valor de ph es: " << value << std::endl;
+        }
+        filePh << value << " " << getCurrentTime() << std::endl;  // Append current time
     }
 
     // Close file
     filePh.close();
+    bufferPh->~Buffer();
 
     return NULL;
 }
@@ -89,17 +139,22 @@ void* h_temperatura(void* arg) {
     }
     if (args->isFinished){
         fileTemp.close();
+        bufferTemp->~Buffer();
         return NULL;
     }
     // Write data from buffer to file
-    int data;
-    while ((data = bufferTemp->remove()) != -1) {  // Assuming -1 indicates end of data
-        fileTemp << data << " " << time(0) << std::endl;  // Append current time
+    std::string data;
+    while ((data = bufferTemp->remove()) != "-1") {  // Assuming -1 indicates end of data
+        int value = std::stoi(data);
+        if(value >=31.6 || value <= 20){
+            std::cout << "Alerta: el valor de temperatura es: " << value << std::endl;
+        }
+        fileTemp << value << " " << getCurrentTime() << std::endl;  // Append current time
     }
 
     // Close file
     fileTemp.close();
-
+    bufferTemp->~Buffer();
     return NULL;
 }
 
