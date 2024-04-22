@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/MonitoreoSensores.dir/main.cpp.o CMakeFiles/MonitoreoSensores.dir/sensor.cpp.o CMakeFiles/MonitoreoSensores.dir/monitor.cpp.o CMakeFiles/MonitoreoSensores.dir/buffer.cpp.o -o MonitoreoSensores 

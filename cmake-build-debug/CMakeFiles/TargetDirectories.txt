@@ -1,0 +1,3 @@
+/home/jose-jaramillo/Documentos/Sistemas Operativos/MonitoreoSensores/cmake-build-debug/CMakeFiles/MonitoreoSensores.dir
+/home/jose-jaramillo/Documentos/Sistemas Operativos/MonitoreoSensores/cmake-build-debug/CMakeFiles/edit_cache.dir
+/home/jose-jaramillo/Documentos/Sistemas Operativos/MonitoreoSensores/cmake-build-debug/CMakeFiles/rebuild_cache.dir
