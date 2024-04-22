@@ -5,6 +5,7 @@
 #include <fstream>
 #include <pthread.h>
 #include <unistd.h>
+#include <semaphore.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <ctime>
@@ -15,7 +16,7 @@ struct ThreadArgs {
     Buffer* bufferPh;
     Buffer* bufferTemp;
     char* pipeName;
-    bool isFinished;
+    sem_t sem;
 };
 
 bool is_float(const std::string& str) {
@@ -40,6 +41,7 @@ bool is_integer(const std::string& str) {
         return false;
     }
 }
+//Funcion para obtener la hora actual
 std::string getCurrentTime() {
     std::time_t currentTime = std::time(nullptr);
     std::tm* localTime = std::localtime(&currentTime);
@@ -47,7 +49,7 @@ std::string getCurrentTime() {
     std::strftime(timeString, sizeof(timeString), "%H:%M:%S", localTime);
     return std::string(timeString);
 }
-// Thread functions
+// Funcion para recolectar datos de los sensores y manejarlos entre Hilos
 void* h_recolector(void* arg) {
 
     ThreadArgs* args = (ThreadArgs*)arg;
@@ -55,32 +57,46 @@ void* h_recolector(void* arg) {
     Buffer* bufferTemp = args->bufferTemp;
     char* pipeName = args->pipeName;
 
-    // Open pipe
+    // Abrir el Pipe
     int pipeFd = open(pipeName, O_RDONLY);
     if (pipeFd < 0) {
-        args->isFinished = true;
+        sem_post(&args->sem);
         std::cerr << "Failed to open pipe: " << pipeName << std::endl;
         return NULL;
     }
-
-    char buffer[128];
-    ssize_t bytesRead;
-    while ((bytesRead = read(pipeFd, buffer, sizeof(buffer) - 1)) > 0) {
+    // Leer datos del pipe
+    std::string line;
+    while (true) {
+        char buffer[256];
+        int bytesRead = read(pipeFd, buffer, sizeof(buffer) - 1);
+        if (bytesRead <= 0) {
+            // El sensor no esta conectado, esperando 10 segundos
+            sleep(10);
+            // Enviando mensajes a los otros hilos para que terminen
+            bufferPh->add("-1");
+            bufferTemp->add("-1");
+            // Borrando pipe y terminando el proceso
+            unlink(args->pipeName);
+            std::cout << "Finished processing measurements" << std::endl;
+            break;
+        }
+        // Procesar la linea y agregar a los buffers
         buffer[bytesRead] = '\0';
-        std::string data(buffer);
-        if (is_integer(data)) {
-            int value = std::stoi(data);
+        line = buffer;
+        // Revisando si la linea es un entero
+        if (is_integer(line)) {
+            int value = std::stoi(line);
             if (value >= 0) {
-                bufferTemp->add(data);
+                bufferTemp->add(line);
             } else {
                 std::cerr << "Error: received negative value from sensor" << std::endl;
             }
         }
-        // Verificar si los datos son de tipo float
-        else if (is_float(data)) {
-            float value = std::stof(data);
+        // Revisando si la linea es un flotante
+        else if (is_float(line)) {
+            float value = std::stof(line);
             if (value >= 0.0) {
-                bufferPh->add(data);
+                bufferPh->add(line);
             } else {
                 std::cerr << "Error: received negative value from sensor" << std::endl;
             }
@@ -88,9 +104,8 @@ void* h_recolector(void* arg) {
         else {
             std::cerr << "Error: received invalid value from sensor" << std::endl;
         }
-            // Verificar si los datos son de tipo entero
     }
-    // Close pipe
+    // Cerrando el pipe
     close(pipeFd);
 
     return NULL;
@@ -99,29 +114,32 @@ void* h_recolector(void* arg) {
 void* h_ph(void* arg) {
     ThreadArgs* args = (ThreadArgs*)arg;
     Buffer* bufferPh = args->bufferPh;
-    // Open file
+    int sem_val;
+    sem_getvalue(&args->sem, &sem_val);
+    // Abrir el archivo
     std::ofstream filePh("file-ph.txt");
     if (!filePh.is_open()) {
         std::cerr << "Failed to open file: file-ph.txt" << std::endl;
         return NULL;
     }
-    if(args->isFinished){
+
+    if (sem_val > 0){
         filePh.close();
         bufferPh->~Buffer();
         return NULL;
     }
 
-    // Write data from buffer to file
+    // Escritura de datos del buffer al archivo
     std::string data;
     while ((data = bufferPh->remove()) != "-1") {
-        float value = std::stof(data);// Assuming -1 indicates end of data
+        float value = std::stof(data);
         if(value >=8.0 || value <= 6.0){
             std::cout << "Alerta: el valor de ph es: " << value << std::endl;
         }
-        filePh << value << " " << getCurrentTime() << std::endl;  // Append current time
+        filePh << value << " " << getCurrentTime() << std::endl;
     }
 
-    // Close file
+    // Cerrando archivo
     filePh.close();
     bufferPh->~Buffer();
 
@@ -131,41 +149,44 @@ void* h_ph(void* arg) {
 void* h_temperatura(void* arg) {
     ThreadArgs* args = (ThreadArgs*)arg;
     Buffer* bufferTemp = args->bufferTemp;
-    // Open file
+    int sem_val;
+    sem_getvalue(&args->sem, &sem_val);
+    // Abrir el archivo
     std::ofstream fileTemp("file-temp.txt");
     if (!fileTemp.is_open()) {
         std::cerr << "Failed to open file: file-temp.txt" << std::endl;
         return NULL;
     }
-    if (args->isFinished){
+    if (sem_val > 0){
         fileTemp.close();
         bufferTemp->~Buffer();
         return NULL;
     }
-    // Write data from buffer to file
+    // Escribir datos del buffer al archivo
     std::string data;
-    while ((data = bufferTemp->remove()) != "-1") {  // Assuming -1 indicates end of data
+    while ((data = bufferTemp->remove()) != "-1") {
         int value = std::stoi(data);
         if(value >=31.6 || value <= 20){
             std::cout << "Alerta: el valor de temperatura es: " << value << std::endl;
         }
-        fileTemp << value << " " << getCurrentTime() << std::endl;  // Append current time
+        fileTemp << value << " " << getCurrentTime() << std::endl;
     }
 
-    // Close file
+    // Cerrando archivo
     fileTemp.close();
     bufferTemp->~Buffer();
     return NULL;
 }
 
 int main(int argc, char *argv[]) {
-    // Parse command line arguments
+    // Iniciando variables
+
     int opt;
     int bufferSize = 0;
     char* fileTemp = nullptr;
     char* filePh = nullptr;
     char* pipeName = nullptr;
-
+    //Revisando argumentos y asignandolos
     while ((opt = getopt(argc, argv, "b:t:h:p:")) != -1) {
         switch (opt) {
             case 'b':
@@ -186,14 +207,20 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Open pipe
+    // Creando Pipe
+    if (mkfifo(pipeName, 0666) < 0) {
+        std::cerr << "Failed to create pipe: " << pipeName << std::endl;
+        return 1;
+    }
+
+    // Abriendo pipe
     int pipeFd = open(pipeName, O_RDONLY);
     if (pipeFd < 0) {
         std::cerr << "Failed to open pipe: " << pipeName << std::endl;
         return 1;
     }
 
-    // Create buffers
+    // Creando buffers
     Buffer bufferPh(bufferSize);
     Buffer bufferTemp(bufferSize);
 
@@ -201,19 +228,19 @@ int main(int argc, char *argv[]) {
     args.bufferPh = &bufferPh;
     args.bufferTemp = &bufferTemp;
     args.pipeName = pipeName;
-    // Create threads
+    sem_init(&args.sem, 0, 0);
+    // Creando Hilos
     pthread_t threadRecolector, threadPh, threadTemp;
     pthread_create(&threadRecolector, NULL, h_recolector, &args);
     pthread_create(&threadPh, NULL, h_ph, &args);
     pthread_create(&threadTemp, NULL, h_temperatura, &args);
-
-    // Join threads
+    // Uniendo Hilos
     pthread_join(threadRecolector, NULL);
     pthread_join(threadPh, NULL);
     pthread_join(threadTemp, NULL);
 
-    // Close pipe
+    // Cerrando pipe y desroyendo semaforo
     close(pipeFd);
-
+    sem_destroy(&args.sem);
     return 0;
 }
