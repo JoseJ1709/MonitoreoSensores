@@ -1,6 +1,10 @@
-//
-// Created by jose-jaramillo on 3/26/24.
-//
+/*
+Nombre del archivo: buffer.h
+Autores: Lucas Rivera, Jose Jaramillo
+Objetivo: Definir la clase Buffer y sus métodos.
+Módulos: Buffer, ~Buffer, add, remove
+*/
+
 #ifndef BUFFER_H
 #define BUFFER_H
 
