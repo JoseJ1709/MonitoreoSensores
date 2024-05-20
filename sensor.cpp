@@ -7,6 +7,29 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+bool is_float(const std::string& str) {
+    try {
+        std::size_t pos;
+        std::stof(str, &pos);
+        // La conversión tiene éxito si no hay caracteres restantes en la cadena
+        return pos == str.size();
+    } catch (...) {
+        return false;
+    }
+}
+
+// Función para verificar si una cadena representa un número entero
+bool is_integer(const std::string& str) {
+    try {
+        std::size_t pos;
+        std::stoi(str, &pos);
+        // La conversión tiene éxito si no hay caracteres restantes en la cadena
+        return pos == str.size();
+    } catch (...) {
+        return false;
+    }
+}
+
 int main(int argc, char *argv[]) {
     // Iniciando variables
     int opt;
@@ -55,9 +78,26 @@ int main(int argc, char *argv[]) {
     // Leyendo archivo y escribiendo en pipe
     std::string line;
     while (std::getline(dataFile, line)) {
-        write(pipeFd, line.c_str(), line.size() + 1);
-        std::cerr << line << std::endl;
-        sleep(timeInterval);
+        // Verificar el tipo de sensor
+        if (sensorType == 1) { // Temperatura
+            if (is_integer(line)) {
+                write(pipeFd, line.c_str(), line.size() + 1);
+                std::cerr << line << std::endl;
+                sleep(timeInterval);
+
+            }
+        } else if (sensorType == 2) { // PH
+            if (!is_integer(line)) {
+                if (is_float(line)){
+                    write(pipeFd, line.c_str(), line.size() + 1);
+                    std::cerr << line << std::endl;
+                    sleep(timeInterval);
+                }
+
+            }
+        } else {
+            std::cerr << "Invalid sensor type: " << sensorType << std::endl;
+        }
     }
 
     // Cerrand archivo y pipe
