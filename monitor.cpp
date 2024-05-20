@@ -1,4 +1,9 @@
-
+/*
+Nombre del archivo: monitor.cpp
+Autores: Lucas Rivera, Jose Jaramillo
+Objetivo: Implementar el monitoreo de los sensores y la escritura de los datos en los archivos correspondientes.
+Módulos: is_float, is_integer, getCurrentTime, h_recolector, h_ph, h_temperatura, main
+*/
 #include "buffer.cpp"
 #include <ctime>
 #include <fcntl.h>
@@ -9,15 +14,30 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+/*
+Nombre de la estructura: ThreadArgs
+Descripción: Estructura para almacenar los argumentos que se pasarán a los hilos.
+Contiene punteros a los búferes para los datos de pH y temperatura,
+los nombres de los archivos donde se escribirán los datos,
+el nombre del pipe para la comunicación con el sensor,
+y un semáforo para la sincronización de los hilos.
+*/
 struct ThreadArgs {
-    Buffer *bufferPh;
-    Buffer *bufferTemp;
-    char *pipeName;
-    char *fileTemp;
-    char *filePh;
-    sem_t sem;
+    Buffer *bufferPh;      // Puntero al búfer para los datos de pH
+    Buffer *bufferTemp;    // Puntero al búfer para los datos de temperatura
+    char *pipeName;        // Nombre del pipe para la comunicación con el sensor
+    char *fileTemp;        // Nombre del archivo donde se escribirán los datos de temperatura
+    char *filePh;          // Nombre del archivo donde se escribirán los datos de pH
+    sem_t sem;             // Semaforo para la sincronización de los hilos
 };
 
+
+/*
+Nombre de la función: is_float
+Parámetros de entrada: const std::string &str
+Valor que devuelve: bool
+Descripción: Verifica si una cadena representa un número de punto flotante.
+*/
 bool is_float(const std::string &str) {
     try {
         std::size_t pos;
@@ -29,7 +49,12 @@ bool is_float(const std::string &str) {
     }
 }
 
-// Función para verificar si una cadena representa un número entero
+/*
+Nombre de la función: is_integer
+Parámetros de entrada: const std::string &str
+Valor que devuelve: bool
+Descripción: Verifica si una cadena representa un número entero.
+*/
 bool is_integer(const std::string &str) {
     try {
         std::size_t pos;
@@ -40,7 +65,13 @@ bool is_integer(const std::string &str) {
         return false;
     }
 }
-// Funcion para obtener la hora actual
+
+/*
+Nombre de la función: getCurrentTime
+Parámetros de entrada: N/A
+Valor que devuelve: std::string
+Descripción: Obtiene la hora actual.
+*/
 std::string getCurrentTime() {
     std::time_t currentTime = std::time(nullptr);
     std::tm *localTime = std::localtime(&currentTime);
@@ -48,7 +79,13 @@ std::string getCurrentTime() {
     std::strftime(timeString, sizeof(timeString), "%H:%M:%S", localTime);
     return std::string(timeString);
 }
-// Funcion para recolectar datos de los sensores y manejarlos entre Hilos
+
+/*
+Nombre de la función: h_recolector
+Parámetros de entrada: void *arg
+Valor que devuelve: void*
+Descripción: Función para recolectar datos de los sensores y manejarlos entre Hilos.
+*/
 void *h_recolector(void *arg) {
 
     ThreadArgs *args = (ThreadArgs *)arg;
@@ -126,6 +163,12 @@ void *h_recolector(void *arg) {
     return NULL;
 }
 
+/*
+Nombre de la función: h_ph
+Parámetros de entrada: void *arg
+Valor que devuelve: void*
+Descripción: Función para escribir los datos del sensor de pH en un archivo.
+*/
 void *h_ph(void *arg) {
     ThreadArgs *args = (ThreadArgs *)arg;
     Buffer *bufferPh = args->bufferPh;
@@ -163,6 +206,12 @@ void *h_ph(void *arg) {
     return NULL;
 }
 
+/*
+Nombre de la función: h_temperatura
+Parámetros de entrada: void *arg
+Valor que devuelve: void*
+Descripción: Función para escribir los datos del sensor de temperatura en un archivo.
+*/
 void *h_temperatura(void *arg) {
     ThreadArgs *args = (ThreadArgs *)arg;
     Buffer *bufferTemp = args->bufferTemp;
@@ -197,6 +246,12 @@ void *h_temperatura(void *arg) {
     return NULL;
 }
 
+/*
+Nombre de la función: main
+Parámetros de entrada: int argc, char *argv[]
+Valor que devuelve: int
+Descripción: Función principal que inicia el monitoreo de los sensores.
+*/
 int main(int argc, char *argv[]) {
     // Iniciando variables
 

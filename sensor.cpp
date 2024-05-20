@@ -1,12 +1,21 @@
-//
-// Created by jose-jaramillo on 3/26/24.
-//
+/*
+Nombre del archivo: sensor.cpp
+Autores: Lucas Rivera, Jose Jaramillo
+Objetivo: Implementar la lectura de los datos de los sensores desde un archivo y la escritura de estos datos en un pipe.
+Módulos: is_float, is_integer, main
+*/
 #include <iostream>
 #include <fstream>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
+/*
+Nombre de la función: is_float
+Parámetros de entrada: const std::string& str
+Valor que devuelve: bool
+Descripción: Verifica si una cadena representa un número de punto flotante.
+*/
 bool is_float(const std::string& str) {
     try {
         std::size_t pos;
@@ -18,7 +27,12 @@ bool is_float(const std::string& str) {
     }
 }
 
-// Función para verificar si una cadena representa un número entero
+/*
+Nombre de la función: is_integer
+Parámetros de entrada: const std::string& str
+Valor que devuelve: bool
+Descripción: Verifica si una cadena representa un número entero.
+*/
 bool is_integer(const std::string& str) {
     try {
         std::size_t pos;
@@ -30,6 +44,12 @@ bool is_integer(const std::string& str) {
     }
 }
 
+/*
+Nombre de la función: main
+Parámetros de entrada: int argc, char *argv[]
+Valor que devuelve: int
+Descripción: Función principal que inicia la lectura de los datos de los sensores desde un archivo y la escritura de estos datos en un pipe.
+*/
 int main(int argc, char *argv[]) {
     // Iniciando variables
     int opt;
